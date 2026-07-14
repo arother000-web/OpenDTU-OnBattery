@@ -7,7 +7,7 @@
 static const char* TAG = "powerMeter";
 static const char* SUBTAG = "SDM";
 
-// Ambil fungsi pembacaan manual dari berkas Pzem.cpp kustom Anda
+// Ambil jembatan fungsi dari Pzem.cpp
 extern float read_custom_pzem_watt();
 
 namespace PowerMeters::Sdm::Serial {
@@ -33,8 +33,7 @@ Provider::~Provider() {
 }
 
 bool Provider::init() {
-    // Kita bypass inisialisasi pin bawaan SDM agar tidak memicu error pin crash
-    return true;
+    return true; // Bypass untuk kestabilan modul 4MB
 }
 
 void Provider::loop() {
@@ -50,7 +49,7 @@ void Provider::loop() {
 }
 
 bool Provider::isDataValid() const {
-    return true; // Paksa status data selalu valid agar tidak dianggap offline oleh web UI
+    return true; // Paksa status data selalu online
 }
 
 void Provider::pollingLoopHelper(void* context) {
@@ -67,9 +66,9 @@ bool Provider::readValue(std::unique_lock<std::mutex>& lock, uint16_t reg, float
 void Provider::pollingLoop() {
     std::unique_lock<std::mutex> lock(_pollingMutex);
     while (!_stopPolling) {
-        // Ambil data langsung dari fungsi Arduino PZEM kustom Anda setiap 2 detik
+        // Panggil fungsi pembacaan fisik PZEM-004T Anda
         float phase1Power = read_custom_pzem_watt();
-        float phase1Voltage = 220.0; // Nilai tegangan statis amfibi agar kalkulasi web stabil
+        float phase1Voltage = 220.0;
         float energyImport = 0.0;
         float energyExport = 0.0;
 
@@ -81,9 +80,7 @@ void Provider::pollingLoop() {
             _dataCurrent.add<DataPointLabel::Export>(energyExport);
         }
 
-        DTU_LOGD("Suntikan PZEM Watt Sukses: %5.2f W", phase1Power);
-        
-        // Jeda waktu antar pembacaan sensor (2000 milidetik = 2 detik)
+        DTU_LOGD("Suntikan PZEM Sukses: %5.2f W", phase1Power);
         _cv.wait_for(lock, std::chrono::milliseconds(2000), [this] { return _stopPolling; });
     }
 }
